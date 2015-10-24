@@ -26,10 +26,15 @@
 
 (defmulti read om/dispatch)
 
+(defn add-friend-count [person]
+  (assoc person :friends/count (count (:friends person))))
+
 (defmethod read :people
   [{:keys [state]} key params]
   (let [st @state]
-    {:value (into [] (map #(get-in st %)) (:people st))}))
+    {:value (into []
+              (map #(add-friend-count (get-in st %)))
+              (:people st))}))
 
 (defmulti mutate om/dispatch)
 
@@ -74,9 +79,7 @@
   (parser {:state app-state} [:people])
 
   (parser {:state app-state} '[(friend/add {:id 0 :friend 1})])
-  @app-state
   (parser {:state app-state} '[(friend/remove {:id 0 :friend 1})])
-  @app-state
 
   (def init-state
     {:ids #{}})
