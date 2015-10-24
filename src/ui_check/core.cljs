@@ -24,8 +24,59 @@
   (query [this]
     [{:people (om/get-query Person)}]))
 
+(defmulti read om/dispatch)
+
+(defmethod read :people
+  [{:keys [state]} key params]
+  (let [st @state]
+    {:value (into [] (map #(get-in st %)) (:people st))}))
+
+(defmulti mutate om/dispatch)
+
+(defn add-friend [friends ref]
+  (cond-> friends
+    (not (some #{ref} friends)) (conj ref)))
+
+(defmethod mutate 'friend/add
+  [{:keys [state] :as env} key {:keys [id friend] :as params}]
+  {:action
+   (fn []
+     (swap! state
+       (fn [state']
+         (-> state'
+           (update-in [:person/by-id id :friends]
+             add-friend [:person/by-id friend])
+           (update-in [:person/by-id friend :friends]
+             add-friend [:person/by-id id])))))})
+
+(defn remove-friend [friends ref]
+  (cond->> friends
+    (some #{ref} friends) (into [] (remove #{ref}))))
+
+(defmethod mutate 'friend/remove
+  [{:keys [state] :as env} key {:keys [id friend] :as params}]
+  {:action
+   (fn []
+     (swap! state
+       (fn [state']
+         (-> state'
+           (update-in [:person/by-id id :friends]
+             remove-friend [:person/by-id friend])
+           (update-in [:person/by-id friend :friends]
+             remove-friend [:person/by-id id])))))})
+
+(def app-state
+  (atom (om/normalize People init-data true)))
+
+(def parser (om/parser {:read read :mutate mutate}))
+
 (comment
-  (om/normalize People init-data true)
+  (parser {:state app-state} [:people])
+
+  (parser {:state app-state} '[(friend/add {:id 0 :friend 1})])
+  @app-state
+  (parser {:state app-state} '[(friend/remove {:id 0 :friend 1})])
+  @app-state
 
   (def init-state
     {:ids #{}})
