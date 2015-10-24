@@ -20,12 +20,12 @@
     [:id :name :friends]))
 
 (defui People
-  static om/Query
+  static om/IQuery
   (query [this]
     [{:people (om/get-query Person)}]))
 
 (comment
-
+  (om/normalize People init-data true)
 
   (def init-state
     {:ids #{}})
