@@ -11,13 +11,21 @@
             {:id 1 :name "Laura" :friends []}
             {:id 2 :name "Mary" :friends []}]})
 
+(defui Friend
+  static om/Ident
+  (ident [this props]
+    [:person/by-id (:id props)])
+  static om/IQuery
+  (query [this]
+    [:id :name]))
+
 (defui Person
   static om/Ident
   (ident [this props]
     [:person/by-id (:id props)])
   static om/IQuery
   (query [this]
-    [:id :name :friends]))
+    [:id :name {:friends (om/get-query Friend)}]))
 
 (defui People
   static om/IQuery
@@ -26,15 +34,13 @@
 
 (defmulti read om/dispatch)
 
-(defn add-friend-count [person]
+(defn to-person [person st]
   (assoc person :friends/count (count (:friends person))))
 
 (defmethod read :people
-  [{:keys [state]} key params]
+  [{:keys [state parser selector] :as env} key params]
   (let [st @state]
-    {:value (into []
-              (map #(add-friend-count (get-in st %)))
-              (:people st))}))
+    {:value (om/denormalize selector (get st key) st)}))
 
 (defmulti mutate om/dispatch)
 
