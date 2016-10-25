@@ -53,7 +53,7 @@
           add* [:person/by-id friend])
         (update-in [:person/by-id friend :friends]
           add* [:person/by-id id]))
-      friend)))
+      state)))
 
 (defmethod mutate 'friend/add
   [{:keys [state] :as env} key {:keys [id friend] :as params}]
