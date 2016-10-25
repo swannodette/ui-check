@@ -1,6 +1,5 @@
 (ns ui-check.core
-  (:require [goog.dom :as gdom]
-            [clojure.test.check :as tc]
+  (:require [clojure.test.check :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
             [om.next :as om :refer-macros [defui]]
@@ -9,9 +8,9 @@
 (enable-console-print!)
 
 (def init-data
-  {:people [{:id 0 :name "Bob" :friends []}
+  {:people [{:id 0 :name "Bob"   :friends []}
             {:id 1 :name "Laura" :friends []}
-            {:id 2 :name "Mary" :friends []}]})
+            {:id 2 :name "Mary"  :friends []}]})
 
 (defui Friend
   static om/Ident
@@ -37,10 +36,10 @@
 (defmulti read om/dispatch)
 
 (defmethod read :people
-  [{:keys [state selector] :as env} key _]
+  [{:keys [state query] :as env} key _]
   (let [st @state]
-    (println selector)
-    {:value (om/denormalize selector (get st key) st)}))
+    (println query)
+    {:value (om/db->tree query (get st key) st)}))
 
 (defmulti mutate om/dispatch)
 
@@ -78,7 +77,7 @@
   {:action (fn [] (swap! state remove-friend id friend))})
 
 (def app-state
-  (atom (om/normalize People init-data true)))
+  (atom (om/tree->db People init-data true)))
 
 (def parser (om/parser {:read read :mutate mutate}))
 
@@ -98,7 +97,7 @@
 (defn prop-no-self-friending []
   (prop/for-all [tx gen-tx-add-remove]
     (let [parser (om/parser {:read read :mutate mutate})
-          state  (atom (om/normalize People init-data true))]
+          state  app-state]
       (parser {:state state} tx)
       (let [ui (parser {:state state} (om/get-query People))]
         (not (some self-friended? (:people ui)))))))
@@ -113,18 +112,18 @@
 (defn prop-friend-consistency []
   (prop/for-all [tx gen-tx-add-remove]
     (let [parser (om/parser {:read read :mutate mutate})
-          state  (atom (om/normalize People init-data true))]
+          state  app-state]
       (parser {:state state} tx)
       (let [ui (parser {:state state} (om/get-query People))]
         (friends-consistent? (:people ui))))))
 
 (comment
-  (gen/sample gen-tx-add 10)
+  (gen/sample gen-tx-add-remove 10)
 
   (tc/quick-check 100 (prop-no-self-friending))
   (tc/quick-check 100 (prop-friend-consistency))
 
-  (om/normalize People init-data true)
+  (om/tree->db People init-data true)
 
   ;; basic testing
   (-> (parser {:state app-state} (om/get-query People))
@@ -134,7 +133,7 @@
   (parser {:state app-state} '[(friend/add {:id 0 :friend 1})])
   (parser {:state app-state} '[(friend/add {:id 1 :friend 1})])
   (parser {:state app-state} '[(friend/remove {:id 1 :friend 1})])
-
+  (parser {:state app-state} '[(friend/remove {:id 1 :friend 0})])
   (some self-friended?
     (:people (parser {:state app-state} (om/get-query People))))
 
